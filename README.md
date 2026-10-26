@@ -61,12 +61,3 @@ Permutation inference assumes independent individuals and exchangeability under 
 - `scripts/`: dependency installation, analysis, rendering, and validation entry points.
 
 Generated analysis tables are written as CSV files to `results/tables/`; figures are saved as PNG and PDF files in `results/figures/`. These reproducible outputs are excluded from Git. The embedded data, analysis code, and rendered HTML report are included in Git.
-
-## Publish on GitHub
-
-Create an empty GitHub repository, then run the following commands from this repository root, replacing the URL with your repository address:
-
-```bash
-git remote add origin <YOUR_GITHUB_REPOSITORY_URL>
-git push -u origin main
-```
