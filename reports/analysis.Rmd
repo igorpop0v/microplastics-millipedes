@@ -1,0 +1,300 @@
+---
+title: "Microplastic particles recovered from millipedes"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+lang: en
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: false
+    number_sections: true
+    code_folding: none
+    self_contained: true
+    mathjax: null
+    theme: default
+    highlight: default
+    css: report.css
+---
+
+```{r report-setup, include=FALSE}
+project_root <- if (file.exists("config.R")) normalizePath(".") else normalizePath("..")
+knitr::opts_knit$set(root.dir = project_root)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = TRUE,
+  fig.width = 11, fig.height = 6, dpi = 120, out.width = "100%", fig.align = "center")
+source(file.path(project_root, "R/report_helpers.R"), local = knitr::knit_global(), encoding = "UTF-8")
+```
+
+# Materials and Methods
+
+## Experimental dataset
+
+The analysed dataset comprised 275 millipedes: 250 exposed individuals and 25 controls. The exposure design crossed five life-form categories (small juloid, middle juloid, big juloid, polydesmoid and platydesmoid), five polymers (LDPE, PET, PLA, PP and PVC), and two input particle-size fractions (0.1–0.2 and 3–5 mm), with five individuals per combination. Five controls were available for each life form. Each sample identifier represented a distinct biological individual, which was treated as the independent unit of analysis. The two responses were the number of recovered particles per individual and the mean particle size for that individual, measured in millimetres. Individual means were not weighted by recovered particle count.
+
+## Data preparation
+
+The individual-level dataset was defined directly in R, preserving the recorded counts, raw mean-size entries and original input-size labels. No external data files were required. Sample identifiers, factor levels, integer counts and consistency between count and size measurements were checked. All exposed individuals and all polymer treatments were retained in the count analysis. The 57 zero-count observations, including all 50 exposed platydesmoid individuals, were retained as observed zeros. Mean particle size was treated as undefined when no particles were recovered; zero sizes were not imputed as measurements. Size analyses therefore used the 193 exposed individuals with positive counts and positive measured mean sizes. Controls were summarized separately for quality assessment, and no background subtraction was performed. Input-size categories were not assigned to controls.
+
+## Pairwise comparisons and effect sizes
+
+Comparisons were stratified by the experimental factors. Life forms were compared within each polymer-by-input-fraction combination, polymers within each life-form-by-input-fraction combination, and input fractions within each life-form-by-polymer combination. Pairwise comparisons used two-sided label-permutation tests of the difference in arithmetic means for counts and the difference in mean natural-log sizes for particle size. All assignments of the pooled observations to the two groups were enumerated while preserving group sizes; all 385 eligible pairwise comparisons used exact enumeration. Comparisons required at least two eligible individuals in each group. Count effects were reported as differences in arithmetic mean counts, and size effects as ratios of geometric means of individual mean sizes, obtained by exponentiating the mean log-size differences. Approximate, unadjusted 95% Welch confidence intervals were calculated on the corresponding analysis scale; log-size intervals were exponentiated. Intervals were left undefined when both groups were constant. Permutation inference assumed exchangeability of independent individuals under the null hypothesis within each comparison.
+
+## Multiple testing
+
+Benjamini–Hochberg correction was applied separately to the six families defined by response and comparison type, pooling eligible comparisons across all strata within each family. These families contained 100, 100 and 25 count comparisons, and 60, 80 and 20 size comparisons, for life forms, polymers and input fractions, respectively. Adjusted p-values below 0.05 were considered statistically significant. The 65 size comparisons lacking eligible platydesmoid observations were recorded as unavailable rather than assigned p-values. Adjustment was interpreted within each family; the standard false-discovery-rate guarantee requires independent or suitably positively dependent tests. The procedure was implemented with [`stats::p.adjust`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/p.adjust.html).
+
+## Omnibus comparisons
+
+Omnibus differences among life forms were additionally assessed within each of the ten polymer-by-input-fraction combinations. The group-size-weighted between-group sum of squares was calculated for counts on their original scale and for mean sizes after natural-log transformation. Null distributions were generated from 9,999 random permutations that preserved group sizes. Monte Carlo p-values were calculated as (b + 1)/(9,999 + 1), where b was the number of permuted statistics at least as large as the observed statistic. Benjamini–Hochberg correction was applied separately to the ten count tests and ten size tests. The count tests included five life forms, whereas the size tests included the four life forms with defined particle sizes. Random-number generation used seed 20261025. The addition of one to the numerator and denominator follows [Phipson and Smyth (2010)](https://pubmed.ncbi.nlm.nih.gov/21044043/).
+
+## Principal component analysis and software
+
+Principal component analysis was used to visualize joint variation in the two responses for the 193 individuals with defined particle sizes. Counts were transformed as ln(1 + count), mean sizes as ln(mean size), and both variables were centred and scaled to unit sample standard deviation before analysis with [`stats::prcomp`](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/prcomp.html). Life form and input fraction were used as plot annotations. Individuals without particles were displayed separately and were not assigned artificial size measurements or principal-component scores. PCA was interpreted descriptively. All analyses were performed in R 4.6.1, and figures were generated with ggplot2 and patchwork. Both components together represented all variation in the two transformed variables. Individual observations and medians were plotted, and figures were exported as 300-dpi PNG and vector PDF files.
+
+Life-form differences were interpreted together with species identity because these factors were not independently replicated. Comparisons of recovered counts and sizes did not estimate fragmentation efficiency, ingestion fractions or rates of polymer degradation; individual input-size distributions, administered particle counts and recovery efficiencies were unavailable.
+
+# Analysis code
+
+The following blocks contain the complete dataset, analysis functions and their execution, including statistical tests, PCA, figure construction and export. Comments are kept brief; the methods are described above.
+
+## Dataset definition
+
+```{r embedded-dataset, code = report_code("R/data.R")}
+
+```
+
+## R Markdown settings
+
+```{r rendering-settings, ref.label='report-setup', eval=FALSE, include=TRUE, echo=TRUE}
+```
+
+## Package installation and report utilities
+
+```{r install-packages, code = report_code("scripts/install_packages.R"), eval=FALSE}
+
+```
+
+```{r report-utilities, code = report_code("R/report_helpers.R")}
+
+```
+
+## Runtime and analysis settings
+
+```{r runtime}
+if (!nzchar(Sys.getenv("TZ"))) Sys.setenv(TZ = "UTC")
+required <- c("ggplot2", "dplyr", "patchwork")
+missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing)) stop("Install required packages: ", paste(missing, collapse = ", "))
+suppressPackageStartupMessages(library(ggplot2))
+```
+
+```{r configuration, code = report_code("config.R")}
+
+```
+
+## Data preparation, descriptive summaries and PCA
+
+```{r summary-pca-functions, code = report_code("R/analysis.R", c("life_levels", "polymer_levels", "life_labels", "prepare_data", "select_primary", "summarize_groups", "run_pca"))}
+
+```
+
+## Pairwise permutation tests and confidence intervals
+
+```{r pairwise-test-functions, code = report_code("R/inference.R", c("mp_permutation_difference", "mp_welch_interval", "mp_observed_levels"))}
+
+```
+
+## Omnibus permutation tests
+
+```{r omnibus-functions, code = report_code("R/inference.R", c("mp_permutation_omnibus", "run_omnibus"))}
+
+```
+
+## Stratified contrasts and BH adjustment
+
+```{r contrast-functions, code = report_code("R/inference.R", c("run_inference"))}
+
+```
+
+## Figure theme and file export
+
+```{r theme-functions, code = report_code("R/plot_theme.R")}
+
+```
+
+## Figure construction
+
+```{r figure-functions, code = report_code("R/figures.R")}
+
+```
+
+## Analysis execution and result export
+
+```{r analysis-function, code = report_code("R/analysis.R", c("run_analysis"))}
+
+```
+
+```{r run-analysis}
+set.seed(config$seed)
+results <- run_analysis(input_data, config)
+exposure <- results$data[!results$data$is_control, ]
+controls <- results$data[results$data$is_control, ]
+packages <- c(required, "knitr", "rmarkdown")
+versions <- data.frame(package = packages,
+  version = vapply(packages, function(p) as.character(utils::packageVersion(p)), character(1)))
+utils::write.csv(versions, "results/package_versions.csv", row.names = FALSE)
+```
+
+# Results and figures
+
+## Dataset overview
+
+```{r data-overview, results='asis'}
+show_table(data.frame(
+  subset = c("All individuals", "Exposed individuals", "Controls",
+             "Exposed individuals without particles", "Exposed individuals with defined sizes"),
+  n = c(nrow(results$data), nrow(exposure), nrow(controls),
+        sum(exposure$output_count == 0), sum(is.finite(exposure$output_size_mm)))
+), digits = 0)
+show_table(results$summary[results$summary$is_control,
+  c("life_form", "n_individuals", "n_detected", "count_mean", "count_min", "count_max", "n_size")])
+```
+
+```{r figure-1, fig.width=9, fig.height=4.6, fig.cap="Figure 1. Particle counts in controls: five individuals per life form, all zero.", fig.alt="Figure 1. Particle counts in controls: five individuals per life form, all zero."}
+results$plots$controls
+```
+
+## Particle recovery, counts and sizes
+
+```{r figure-2, fig.width=10, fig.height=5, fig.cap="Figure 2. Individuals with recovered particles by life form, polymer and input size. Labels show detected/total individuals (five per cell).", fig.alt="Figure 2. Individuals with recovered particles by life form, polymer and input size. Labels show detected/total individuals (five per cell)."}
+results$plots$detection
+```
+
+```{r figure-3, fig.width=13, fig.height=7, fig.cap="Figure 3. Recovered counts for all 250 experimental individuals; bars show medians. p_BH: omnibus life-form permutation tests within each polymer × input size, adjusted across 10 panels.", fig.alt="Figure 3. Recovered counts for all 250 experimental individuals; bars show medians. p_BH: omnibus life-form permutation tests within each polymer × input size, adjusted across 10 panels."}
+results$plots$counts
+```
+
+```{r figure-4, fig.width=13, fig.height=9, fig.cap="Figure 4. Individual mean particle sizes (log scale) and medians; the lower strip counts individuals without particles. p_BH: omnibus life-form permutation tests on log size within each polymer × input size, adjusted across 10 panels.", fig.alt="Figure 4. Individual mean particle sizes (log scale) and medians; the lower strip counts individuals without particles. p_BH: omnibus life-form permutation tests on log size within each polymer × input size, adjusted across 10 panels."}
+results$plots$size
+```
+
+```{r descriptive-summary, results='asis'}
+show_table(results$summary[!results$summary$is_control,
+  c("life_form", "polymer", "input_size_class", "n_individuals", "n_detected",
+    "count_mean", "count_sd", "n_size", "size_mean_mm", "size_sd_mm")])
+```
+
+## Omnibus tests and comparison families
+
+```{r omnibus-and-families, results='asis'}
+show_table(results$omnibus[c("outcome", "polymer", "input_size_class", "n_source", "n",
+  "n_groups", "test_statistic", "p_value", "p_bh", "B")], digits = 4)
+show_table(results$inference$family_summary, digits = 5)
+```
+
+Overall life-form differences were detected in `r sum(results$omnibus$p_bh < .05, na.rm = TRUE)` of `r nrow(results$omnibus)` panels after BH adjustment. These tests do not identify the particular pairs that differ. Across the six pairwise-test families, `r sum(results$inference$contrasts$p_bh < .05)` of `r nrow(results$inference$contrasts)` comparisons had p_BH < 0.05; the adjustment applies within each family.
+
+## Comparisons between input fractions
+
+```{r figure-5, fig.width=15, fig.height=5.5, fig.cap="Figure 5. Geometric mean size ratios (0.1–0.2/3–5 mm input), with approximate unadjusted 95% Welch CIs. Permutation p_BH values are adjusted across 20 contrasts; NA indicates undefined size.", fig.alt="Figure 5. Geometric mean size ratios (0.1–0.2/3–5 mm input), with approximate unadjusted 95% Welch CIs. Permutation p_BH values are adjusted across 20 contrasts; NA indicates undefined size."}
+results$plots$size_effects
+```
+
+```{r figure-6, fig.width=15, fig.height=5.5, fig.cap="Figure 6. Mean count differences (0.1–0.2 minus 3–5 mm input), with approximate unadjusted 95% Welch CIs. Permutation p_BH values are adjusted across 25 contrasts; constant zero groups have no CI.", fig.alt="Figure 6. Mean count differences (0.1–0.2 minus 3–5 mm input), with approximate unadjusted 95% Welch CIs. Permutation p_BH values are adjusted across 25 contrasts; constant zero groups have no CI."}
+results$plots$count_effects
+```
+
+## Pairwise comparisons of life forms and polymers
+
+```{r figure-7, fig.width=13, fig.height=8, fig.cap="Figure 7. Life-form comparisons of counts within each polymer × input size. Cells show permutation p_BH values, adjusted across all 100 contrasts.", fig.alt="Figure 7. Life-form comparisons of counts within each polymer × input size. Cells show permutation p_BH values, adjusted across all 100 contrasts."}
+results$plots$count_life_form_pvalues
+```
+
+```{r figure-8, fig.width=13, fig.height=8, fig.cap="Figure 8. Life-form comparisons of log mean size within each polymer × input size. Cells show permutation p_BH values, adjusted across 60 contrasts; NA indicates undefined size.", fig.alt="Figure 8. Life-form comparisons of log mean size within each polymer × input size. Cells show permutation p_BH values, adjusted across 60 contrasts; NA indicates undefined size."}
+results$plots$size_life_form_pvalues
+```
+
+```{r figure-9, fig.width=13, fig.height=8, fig.cap="Figure 9. Polymer comparisons of counts within each life form × input size. Cells show permutation p_BH values, adjusted across all 100 contrasts.", fig.alt="Figure 9. Polymer comparisons of counts within each life form × input size. Cells show permutation p_BH values, adjusted across all 100 contrasts."}
+results$plots$count_polymer_pvalues
+```
+
+```{r figure-10, fig.width=13, fig.height=8, fig.cap="Figure 10. Polymer comparisons of log mean size within each life form × input size. Cells show permutation p_BH values, adjusted across 80 contrasts; NA indicates undefined size.", fig.alt="Figure 10. Polymer comparisons of log mean size within each life form × input size. Cells show permutation p_BH values, adjusted across 80 contrasts; NA indicates undefined size."}
+results$plots$size_polymer_pvalues
+```
+
+## Complete pairwise results
+
+```{r all-contrasts, results='asis'}
+contrast_columns <- c("outcome", "comparison_axis", "life_form", "polymer", "input_size_class",
+  "group_a", "group_b", "n_a", "n_b", "effect", "ci_lower", "ci_upper", "p_value", "p_bh")
+show_table(results$inference$contrasts[contrast_columns], digits = 4)
+```
+
+An additional `r nrow(results$inference$skipped)` size comparisons were unavailable because platydesmoid samples contained no particles. These comparisons were retained in the audit table without p-values. All platydesmoid individuals remained in the count analysis.
+
+## Joint variation in particle count and size
+
+```{r figure-11, fig.width=13, fig.height=9, fig.cap="Figure 11. Count versus mean particle size (log scale) among 193 individuals with particles. The lower strip records the 57 individuals without particles.", fig.alt="Figure 11. Count versus mean particle size (log scale) among 193 individuals with particles. The lower strip records the 57 individuals without particles."}
+results$plots$count_size
+```
+
+```{r figure-12, fig.width=12, fig.height=6, fig.cap="Figure 12. PCA of standardized log1p(count) and log(mean size) for 193 individuals. The adjacent panel counts 57 individuals without particles; their PCA scores are undefined.", fig.alt="Figure 12. PCA of standardized log1p(count) and log(mean size) for 193 individuals. The adjacent panel counts 57 individuals without particles; their PCA scores are undefined."}
+results$plots$pca_scores
+```
+
+```{r pca-tables, results='asis'}
+show_table(results$pca$variance)
+show_table(results$pca$loadings)
+show_table(results$pca$preprocessing)
+```
+
+PC1 accounted for `r formatC(100 * results$pca$variance$explained_fraction[1], format="f", digits=1)`% of the standardized variation. PCA was descriptive; no group significance was inferred from separation in the score plot.
+
+## Individual coverage and data checks
+
+```{r individual-coverage, results='asis'}
+coverage <- aggregate(cbind(n_individuals = rep(1L, nrow(exposure)),
+  n_no_particles = as.integer(exposure$output_count == 0),
+  n_defined_size = as.integer(is.finite(exposure$output_size_mm))),
+  by = list(life_form = exposure$life_form), FUN = sum)
+show_table(coverage, digits = 0)
+issues <- data_issues
+issue_summary <- aggregate(list(n_records = rep(1L, nrow(issues))),
+  by = issues[c("issue_code", "severity", "detail", "action")], FUN = sum)
+show_table(issue_summary, digits = 0)
+```
+
+The original input-size label in five middle-juloid controls was retained in the embedded dataset and set to missing in the analytical control metadata. Raw zero size entries were preserved, while analytical mean size was undefined in samples without particles. The report uses the corrected experimental dataset; specimen material, analytical detection limits, treatment allocation and experimental batches require documentation before manuscript submission.
+
+# Reproducibility
+
+## Validation code
+
+```{r analysis-validation, code = report_code("scripts/check_analysis.R")}
+
+```
+
+All validation checks completed successfully during report rendering.
+
+## Software versions
+
+```{r package-versions, results='asis'}
+show_table(versions)
+```
+
+## Standalone analysis entry point
+
+```{r standalone-analysis, code = report_code("scripts/run_analysis.R"), eval=FALSE}
+
+```
+
+## HTML rendering entry point
+
+```{r standalone-render, code = report_code("scripts/render_report.R"), eval=FALSE}
+
+```
+
+## Session information
+
+```{r session-information}
+sessionInfo()
+```

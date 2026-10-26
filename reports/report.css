@@ -1,0 +1,7 @@
+/* Keep the reference report's standard R Markdown/Bootstrap typography. */
+.main-container { max-width: 940px; }
+
+/* Wide result tables remain usable without changing the page typography. */
+.table-scroll { max-width: 100%; overflow-x: auto; margin-bottom: 20px; }
+
+.figure .caption { text-align: left; margin-top: 8px; }

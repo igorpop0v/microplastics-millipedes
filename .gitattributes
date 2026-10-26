@@ -1,0 +1,8 @@
+* text=auto
+*.R text eol=lf
+*.Rmd text eol=lf
+*.csv text eol=lf
+*.md text eol=lf
+
+# Review the Rmd source; the standalone HTML embeds generated library assets.
+reports/analysis.html linguist-generated=true -whitespace

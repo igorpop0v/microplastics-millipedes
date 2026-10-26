@@ -1,0 +1,19 @@
+# Generated artifacts and local editor files.
+.~lock.*
+~$*
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+.DS_Store
+.agents/
+.codex/
+# Keep the standalone HTML report; other generated artifacts remain untracked.
+results/
+reports/*.html
+!reports/analysis.html
+reports/*_files/
+reports/*_cache/
+reports/*.md
+renv/library/
+renv/staging/
