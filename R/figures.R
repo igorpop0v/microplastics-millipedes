@@ -15,6 +15,7 @@ mp_p_expression <- function(x) {
 }
 
 figure_dimensions <- function(name) {
+  if (name == "before_after_size") return(c(width = 17, height = 10))
   if (name %in% c("size", "count_size")) return(c(width = 13, height = 9))
   if (name == "counts") return(c(width = 13, height = 7))
   if (grepl("_pvalues$", name)) return(c(width = 13, height = 8))
@@ -22,6 +23,92 @@ figure_dimensions <- function(name) {
   if (name == "pca_scores") return(c(width = 12, height = 6))
   if (name == "controls") return(c(width = 9, height = 4.6))
   c(width = 9, height = 5.5)
+}
+
+# Compare stated input intervals with individual mean recovered sizes.
+make_before_after_size <- function(exposure) {
+  summary <- summarize_groups(exposure) |>
+    dplyr::mutate(n_zero = n_individuals - n_size,
+                  x = match(as.character(life_form), life_levels) + 2)
+  positive <- exposure |>
+    dplyr::filter(is.finite(output_size_mm)) |>
+    dplyr::mutate(x = match(as.character(life_form), life_levels) + 2)
+
+  axis_labels <- c("Input range", unname(life_labels[life_levels]))
+  positions <- c(1, 3:7)
+  x_scale <- function() ggplot2::scale_x_continuous(
+    breaks = positions, labels = axis_labels, limits = c(0.4, 7.65),
+    expand = ggplot2::expansion(mult = 0)
+  )
+  fill_scale <- function() ggplot2::scale_fill_manual(
+    values = mp_life_form_colours, limits = life_levels, drop = FALSE
+  )
+
+  make_row <- function(fraction, bounds, breaks, limit) {
+    selected <- dplyr::filter(positive, input_size_class == fraction)
+    sums <- dplyr::filter(summary, input_size_class == fraction)
+    selected$input_size_class <- factor(fraction)
+    sums$input_size_class <- factor(fraction)
+    reference <- data.frame(polymer = factor(polymer_levels, levels = polymer_levels),
+                            input_size_class = factor(fraction),
+                            lower = bounds[1], upper = bounds[2], heading_y = limit * 0.98)
+    labels <- ggplot2::labeller(input_size_class = function(x) paste0(x, " mm input"))
+
+    sizes <- ggplot2::ggplot() +
+      # The white base extends to zero; only the shaded segment is the input range.
+      ggplot2::geom_rect(data = reference,
+        ggplot2::aes(xmin = 0.67, xmax = 1.33, ymin = 0, ymax = upper),
+        fill = "white", colour = "#666666", linewidth = 0.65) +
+      ggplot2::geom_rect(data = reference,
+        ggplot2::aes(xmin = 0.67, xmax = 1.33, ymin = lower, ymax = upper),
+        fill = "#F0F0F0", colour = "#666666", linewidth = 0.65) +
+      ggplot2::geom_vline(xintercept = 2, colour = "#D9D9D9", linewidth = 0.35,
+                 linetype = "dotted") +
+      ggplot2::geom_col(data = dplyr::filter(sums, is.finite(size_median_mm)),
+        ggplot2::aes(x = x, y = size_median_mm, fill = life_form),
+        width = 0.64, alpha = 0.35, colour = "black", linewidth = 0.4) +
+      # Jitter changes horizontal positions only; each point is an individual mean.
+      ggplot2::geom_point(data = selected, ggplot2::aes(x = x, y = output_size_mm, fill = life_form),
+        shape = 21, colour = "black", size = 1.9, stroke = 0.3,
+        position = ggplot2::position_jitter(width = 0.22, height = 0, seed = 1026)) +
+      ggplot2::geom_text(data = reference, ggplot2::aes(x = 1, y = heading_y, label = "Before"),
+                size = 3.1, vjust = 1, colour = "#444444") +
+      ggplot2::geom_text(data = reference, ggplot2::aes(x = 5, y = heading_y, label = "After"),
+                size = 3.1, vjust = 1, colour = "#444444") +
+      ggplot2::facet_grid(input_size_class ~ polymer, labeller = labels, drop = FALSE) +
+      ggplot2::scale_y_continuous(breaks = breaks, limits = c(0, limit),
+                         expand = ggplot2::expansion(mult = c(0, 0))) +
+      x_scale() + fill_scale() + theme_mp(11) +
+      ggplot2::labs(x = NULL, y = "Particle size (mm)") +
+      ggplot2::theme(legend.position = "none", axis.text.x = ggplot2::element_blank(),
+            axis.ticks.x = ggplot2::element_blank(), panel.spacing.x = grid::unit(1.1, "lines"),
+            strip.text.y = ggplot2::element_text(angle = 270, size = 11),
+            plot.margin = ggplot2::margin(9, 10, 1, 10))
+
+    zeros <- ggplot2::ggplot(sums, ggplot2::aes(x = x, y = 1, fill = life_form)) +
+      ggplot2::geom_tile(width = 0.95, height = 0.8, alpha = 0.16, colour = "white",
+                linewidth = 0.5) +
+      ggplot2::geom_text(ggplot2::aes(label = n_zero), size = 3.3) +
+      ggplot2::facet_grid(input_size_class ~ polymer, labeller = labels, drop = FALSE) +
+      x_scale() + fill_scale() +
+      ggplot2::scale_y_continuous(limits = c(0.45, 1.55), breaks = 1, labels = NULL,
+                         expand = ggplot2::expansion(mult = 0)) +
+      ggplot2::labs(x = NULL, y = "No particles\n(n)") + theme_mp(10) +
+      ggplot2::theme(legend.position = "none", axis.line = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_blank(),
+            axis.title.y = ggplot2::element_text(size = 9, angle = 0, hjust = 1, vjust = 0.5),
+            axis.text.x = ggplot2::element_text(size = 9, angle = 55, hjust = 1, vjust = 1),
+            strip.text.x = ggplot2::element_blank(), strip.text.y = ggplot2::element_text(colour = "white", size = 11),
+            panel.spacing.x = grid::unit(1.1, "lines"),
+            plot.margin = ggplot2::margin(0, 10, 8, 10))
+    list(sizes = sizes, zeros = zeros)
+  }
+
+  fine <- make_row("0.1-0.2", c(0.1, 0.2), seq(0, 0.2, 0.05), 0.228)
+  coarse <- make_row("3-5", c(3, 5), 0:5, 5.7)
+  figure <- patchwork::wrap_plots(fine$sizes, fine$zeros, coarse$sizes, coarse$zeros,
+                       ncol = 1, heights = c(3.4, 0.43, 3.4, 0.43))
+  figure
 }
 
 make_figures <- function(data, primary, pca, inference, omnibus) {
@@ -264,5 +351,6 @@ make_figures <- function(data, primary, pca, inference, omnibus) {
        count_life_form_pvalues = pairwise_plot("output_count", "life_form"),
        size_life_form_pvalues = pairwise_plot("output_size_mm", "life_form"),
        count_polymer_pvalues = pairwise_plot("output_count", "polymer"),
-       size_polymer_pvalues = pairwise_plot("output_size_mm", "polymer"))
+       size_polymer_pvalues = pairwise_plot("output_size_mm", "polymer"),
+       before_after_size = make_before_after_size(exposure))
 }
